@@ -11,10 +11,12 @@
 (enable-console-print!)
 
 (def app-state
-  (atom {:loc (model/zipper '[(apply + [1 2 (- 10 7)])])
+  (atom {:loc (model/zipper '[(println "Hello world!")
+                              (apply + [1 2 (- 10 7) 4 5])])
          :bindings {'+ {:type :value :value + :text "cljs.core/+"}
                     '- {:type :value :value - :text "cljs.core/-"}
-                    'apply {:type :value :value apply :text "cljs.core/apply"}}
+                    'apply {:type :value :value apply :text "cljs.core/apply"}
+                    'println {:type :value :value println :text "cljs.core/println"}}
          :desc ["Let's evaluate these forms step by step."]}))
 
 (defcomponent atom* [form owner]

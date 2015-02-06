@@ -4,35 +4,28 @@
   <meta charset="UTF-8">
   <title>Stepwise</title>
   <style>
-  @import url(http://fonts.googleapis.com/css?family=Source+Code+Pro);
-  * {
-    margin: 0;
-    padding: 0;
-  }
   body {
-    font-family: 'Source Code Pro';
-    font-size: 14px;
+    font-size: 16px;
     line-height: 1.4;
     margin: 40px;
   }
-  .toplevel { margin-bottom: 1rem; }
+  .toplevel {
+    font-family: monospace;
+    margin-bottom: 1em;
+  }
   .atom, .stringlike {
     display: inline-block;
     position: relative;
     vertical-align: top;
   }
   .stringlike { white-space: pre-wrap; }
-  .delimiter.left { vertical-align: top; }
-  .delimiter.right { vertical-align: bottom; }
   .spacer { white-space: pre; }
-  .selected { background: rgb(170,203,249); }
+  .selected { color: red !important; }
   .keyword { color: rgb(198,115,91); }
   .stringlike { color: rgb(21,144,155); }
   .delimiter { color: #777; }
-  .description {
-    font-family: Helvetica Neue, Arial, sans-serif;
-    font-size: 16px;
-  }
+  .forms { margin-bottom: 2em; }
+  .description { font-family: Helvetica Neue, Arial, sans-serif; }
   </style>
 </head>
 <body>
