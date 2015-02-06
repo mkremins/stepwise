@@ -31,29 +31,29 @@
         value (bindings (symbol text))]
     (-> interpreter
         (update :loc z/replace value)
-        (assoc :desc (str "Replace the symbol `" text "` by its value.")))))
+        (assoc :desc ["Replace the symbol " [:code text] " by its value."]))))
 
 (defn step-seq [{:keys [loc] :as interpreter}]
   (if (every? fully-simplified? (:children (z/node loc)))
     (-> interpreter
         (update :loc z/edit call-function)
-        (assoc :desc "Call the function with the given arguments."))
+        (assoc :desc ["Call the function with the given arguments."]))
     (assoc interpreter
-      :desc "Looks like a function call, or maybe a special form. Let's go deeper.")))
+      :desc ["Looks like a function call, or maybe a special form. Let's go deeper."])))
 
 (defn step-coll [interpreter]
   (assoc interpreter
-    :desc "This form is a collection. Let's take a look at its items."))
+    :desc ["This form is a collection. Let's take a look at its items."]))
 
 (defn step [interpreter]
   (if-let [{:keys [loc] :as next} (advance interpreter)]
     (let [{:keys [children type] :as node} (z/node loc)]
       (if (fully-simplified? node)
         (assoc next
-          :desc "This form is already completely simplified. Let's move on.")
+          :desc ["This form is already completely simplified. Let's move on."])
         (case type
           :symbol (resolve next)
           :seq (step-seq next)
           (:map :set :vec) (step-coll next))))
     (assoc interpreter
-      :desc "Nothing left to simplify. Looks like our work here is done!")))
+      :desc ["Nothing left to simplify. Looks like our work here is done!"])))

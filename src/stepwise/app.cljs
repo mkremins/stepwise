@@ -15,7 +15,7 @@
          :bindings {'+ {:type :value :value + :text "cljs.core/+"}
                     '- {:type :value :value - :text "cljs.core/-"}
                     'apply {:type :value :value apply :text "cljs.core/apply"}}
-         :desc "Let's evaluate this form step by step."}))
+         :desc ["Let's evaluate these forms step by step."]}))
 
 (defcomponent atom* [form owner]
   (render [_]
@@ -57,7 +57,11 @@
   (render [_]
     (dom/div
       (om/build forms (:loc data))
-      (dom/p {:class "description"} (:desc data))
+      (dom/p {:class "description"}
+        (for [part (:desc data)]
+          (if (= (first part) :code)
+            (dom/code (second part))
+            (dom/span part))))
       (dom/button {:on-click #(om/transact! data eval/step)} "Step >>"))))
 
 (om/root view app-state {:target (.getElementById js/document "app")})
