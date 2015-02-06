@@ -10,12 +10,21 @@
                            ; by the value of the function call
     :symbol false))
 
+(defn extract-value [{:keys [children type value]}]
+  (case type
+    (:bool :keyword :nil :number :string :regex :value) value
+    :map (apply hash-map (map extract-value children))
+    :set (set (map extract-value children))
+    :vec (mapv extract-value children)))
+
 (defn call-function [{[f & args] :children}]
-  (model/parse (apply (:value f) (map :value args))))
+  (model/parse (apply (extract-value f) (map extract-value args))))
 
 (defn advance [{:keys [loc] :as interpreter}]
-  (when-let [loc' ((some-fn z/down z/right z/up) loc)]
-    (assoc interpreter :loc loc')))
+  (if-let [down (when-not (fully-simplified? (z/node loc)) (z/down loc))]
+    (assoc interpreter :loc down)
+    (when-let [loc' ((some-fn z/right z/up) loc)]
+      (assoc interpreter :loc loc'))))
 
 (defn resolve [{:keys [loc bindings] :as interpreter}]
   (let [{:keys [text]} (z/node loc)

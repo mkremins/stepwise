@@ -11,7 +11,7 @@
 (enable-console-print!)
 
 (def app-state
-  (atom {:loc (model/zipper '[(+ 1 2 (- 10 7))])
+  (atom {:loc (model/zipper '[(apply + [1 2 (- 10 7)])])
          :bindings {'+ {:type :value :value + :text "cljs.core/+"}
                     '- {:type :value :value - :text "cljs.core/-"}
                     'apply {:type :value :value apply :text "cljs.core/apply"}}
