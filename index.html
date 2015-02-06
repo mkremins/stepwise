@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Stepwise</title>
+  <style>
+  @import url(http://fonts.googleapis.com/css?family=Source+Code+Pro);
+  * {
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    font-family: 'Source Code Pro';
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .toplevel { margin-bottom: 1rem; }
+  .atom, .stringlike {
+    display: inline-block;
+    position: relative;
+    vertical-align: top;
+  }
+  .stringlike { white-space: pre-wrap; }
+  .delimiter.left { vertical-align: top; }
+  .delimiter.right { vertical-align: bottom; }
+  .spacer { white-space: pre; }
+  .selected { background: rgb(170,203,249); }
+  .keyword { color: rgb(198,115,91); }
+  .stringlike { color: rgb(21,144,155); }
+  .delimiter { color: #777; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="target/stepwise.js"></script>
+</body>
+</html>
