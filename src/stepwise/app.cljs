@@ -10,14 +10,17 @@
 
 (enable-console-print!)
 
+(def default-interpreter
+  {:loc (model/zipper '[(println "Hello world!")
+                        (apply + [1 2 (- 10 7) 4 5])])
+   :bindings {'+ {:type :value :value + :text "cljs.core/+"}
+              '- {:type :value :value - :text "cljs.core/-"}
+              'apply {:type :value :value apply :text "cljs.core/apply"}
+              'println {:type :value :value println :text "cljs.core/println"}}
+   :desc ["Let's evaluate these forms step by step."]})
+
 (def app-state
-  (atom {:loc (model/zipper '[(println "Hello world!")
-                              (apply + [1 2 (- 10 7) 4 5])])
-         :bindings {'+ {:type :value :value + :text "cljs.core/+"}
-                    '- {:type :value :value - :text "cljs.core/-"}
-                    'apply {:type :value :value apply :text "cljs.core/apply"}
-                    'println {:type :value :value println :text "cljs.core/println"}}
-         :desc ["Let's evaluate these forms step by step."]}))
+  (atom {:index 0 :steps (vec (eval/steps default-interpreter))}))
 
 (defcomponent atom* [form owner]
   (render [_]
@@ -57,13 +60,28 @@
 
 (defcomponent view [data owner]
   (render [_]
-    (dom/div
-      (om/build forms (:loc data))
-      (dom/p {:class "description"}
-        (for [part (:desc data)]
-          (if (= (first part) :code)
-            (dom/code (second part))
-            (dom/span part))))
-      (dom/button {:on-click #(om/transact! data eval/step)} "Step >>"))))
+    (let [{:keys [index steps]} data
+          last-index (dec (count steps))
+          step (nth steps index)]
+      (dom/div
+        (om/build forms (:loc step))
+        (dom/p {:class "description"}
+          (for [part (:desc step)]
+            (if (= (first part) :code)
+              (dom/code (second part))
+              (dom/span part))))
+        (dom/input
+          {:type "range" :min 0 :max last-index :value index
+           :on-change #(om/update! data :index
+                         (js/parseInt (.. % -target -value) 10))})
+        (dom/button (if (<= index 0)
+                      {:disabled true}
+                      {:on-click #(om/transact! data :index dec)})
+          "<< Prev")
+        (dom/span {:class "counter"} (str (inc index) " / " (inc last-index)))
+        (dom/button (if (>= index last-index)
+                      {:disabled true}
+                      {:on-click #(om/transact! data :index inc)})
+          "Next >>")))))
 
 (om/root view app-state {:target (.getElementById js/document "app")})

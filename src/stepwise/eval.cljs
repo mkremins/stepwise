@@ -46,14 +46,19 @@
     :desc ["This form is a collection. Let's take a look at its items."]))
 
 (defn step [interpreter]
-  (if-let [{:keys [loc] :as next} (advance interpreter)]
-    (let [{:keys [children type] :as node} (z/node loc)]
-      (if (fully-simplified? node)
-        (assoc next
-          :desc ["This form is already completely simplified. Let's move on."])
-        (case type
-          :symbol (resolve next)
-          :seq (step-seq next)
-          (:map :set :vec) (step-coll next))))
-    (assoc interpreter
-      :desc ["Nothing left to simplify. Looks like our work here is done!"])))
+  (when-not (:done? interpreter)
+    (if-let [{:keys [loc] :as next} (advance interpreter)]
+      (let [{:keys [children type] :as node} (z/node loc)]
+        (if (fully-simplified? node)
+          (assoc next
+            :desc ["This form is already completely simplified. Let's move on."])
+          (case type
+            :symbol (resolve next)
+            :seq (step-seq next)
+            (:map :set :vec) (step-coll next))))
+      (assoc interpreter
+        :desc ["Nothing left to simplify. Looks like our work here is done!"]
+        :done? true))))
+
+(defn steps [interpreter]
+  (take-while identity (iterate step interpreter)))
