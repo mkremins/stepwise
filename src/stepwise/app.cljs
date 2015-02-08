@@ -16,8 +16,7 @@
    :bindings {'+ {:type :value :value + :text "cljs.core/+"}
               '- {:type :value :value - :text "cljs.core/-"}
               'apply {:type :value :value apply :text "cljs.core/apply"}
-              'println {:type :value :value println :text "cljs.core/println"}}
-   :desc ["Let's evaluate these forms step by step."]})
+              'println {:type :value :value println :text "cljs.core/println"}}})
 
 (def app-state
   (atom {:index 0 :steps (vec (eval/steps default-interpreter))}))
