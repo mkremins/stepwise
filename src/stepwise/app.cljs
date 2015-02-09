@@ -12,7 +12,8 @@
 
 (def default-interpreter
   {:loc (model/zipper '[(println "Hello world!")
-                        (apply + [1 2 (- 10 7) 4 5])])
+                        (def x 5)
+                        (apply + [1 2 (- 10 7) 4 x])])
    :bindings {'+ {:type :value :value + :text "cljs.core/+"}
               '- {:type :value :value - :text "cljs.core/-"}
               'apply {:type :value :value apply :text "cljs.core/apply"}

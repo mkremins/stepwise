@@ -37,14 +37,44 @@
         (recur (rest paths) (last more-steps) (concat the-steps more-steps)))
       the-steps)))
 
-(defn seq-steps [state]
-  (let [item-steps (steps* state)]
+(def ^:private head-text
+  (comp :text first :children z/node :loc))
+
+(defmulti special-steps head-text)
+
+(defmethod special-steps "def" [{:keys [loc] :as state}]
+  (let [head-loc (z/down loc)
+        name-loc (z/right head-loc)
+        name (symbol (:text (z/node name-loc)))
+        init-loc (z/right name-loc)
+        init-steps (steps (assoc state :loc init-loc))
+        state' (last init-steps)
+        value (extract-value (z/node (:loc state')))]
     (concat
-      [(assoc state :desc ["Looks like a function call, or maybe a special form. Let's go deeper."])]
-      item-steps
-      [(-> (last item-steps)
-           (update :loc #(-> % z/up (z/edit call-function)))
-           (assoc :desc ["Call the function with the given arguments."]))])))
+      [(assoc state :loc head-loc
+         :desc ["It's a " [:code "def"] " form. Let's define a new var."])
+       (assoc state :loc name-loc
+         :desc ["The var's name will be " [:code (str name)] "..."])
+       (assoc state :loc init-loc
+         :desc ["...and its value will be the result of evaluating this form."])]
+      init-steps
+      [(-> state'
+           (update :loc #(-> % z/up (z/replace {:type :value :text "#'user/x"})))
+           (assoc-in [:bindings name]
+             {:type :value :value value :text (str "user/" name)})
+           (assoc :desc ["Establish the new binding in the current namespace."]))])))
+
+(defn seq-steps [state]
+  (concat
+    [(assoc state :desc ["Looks like a function call, or maybe a special form. Let's go deeper."])]
+    (if-let [special-steps* (get-method special-steps (head-text state))]
+      (special-steps* state)
+      (let [item-steps (steps* state)]
+        (concat
+          item-steps
+          [(-> (last item-steps)
+               (update :loc #(-> % z/up (z/edit call-function)))
+               (assoc :desc ["Call the function with the given arguments."]))])))))
 
 (defn coll-steps [state]
   (let [item-steps (steps* state)]
