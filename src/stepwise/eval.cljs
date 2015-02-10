@@ -64,6 +64,31 @@
              {:type :value :value value :text (str "user/" name)})
            (assoc :desc ["Establish the new binding in the current namespace."]))])))
 
+(defmethod special-steps "if" [{:keys [loc] :as state}]
+  (let [head-loc (z/down loc)
+        test-loc (z/right head-loc)
+        test-steps (steps (assoc state :loc test-loc))
+        state' (last test-steps)
+        test-value (extract-value (z/node (:loc state')))
+        [truthy branch1 branch2] (if test-value ["truthy" "first" "second"]
+                                                ["falsey" "second" "first"])
+        branch-loc (cond-> (z/right (:loc state')) (not test-value) z/right)
+        branch-steps (steps (assoc state' :loc branch-loc))
+        state'' (last branch-steps)]
+    (concat
+      [(assoc state :loc head-loc
+         :desc ["It's an " [:code "if"] " form. Let's simplify."])
+       (assoc state :loc test-loc
+         :desc ["Evaluate the condition to determine which branch to take."])]
+      test-steps
+      [(assoc state' :desc ["The condition is " truthy ". Evaluate the "
+                            branch1 " branch and ignore the " branch2 "."])]
+      branch-steps
+      [(-> state''
+           (update :loc #(-> % z/up (z/replace (z/node (:loc state'')))))
+           (assoc :desc ["Replace the entire form with the value of the "
+                         branch1 " branch."]))])))
+
 (defn bpair-steps [{:keys [loc] :as state}]
   (let [name (symbol (:text (z/node loc)))
         init-loc (z/right loc)
@@ -141,7 +166,7 @@
 (defn steps [state]
   (let [node (z/node (:loc state))]
     (if (fully-simplified? node)
-      [(assoc state :desc ["This form is already completely simplified. Let's move on."])]
+      [(assoc state :desc ["This form is completely simplified. Let's move on."])]
       (case (:type node)
         :symbol [(resolve state)]
         :seq (seq-steps state)

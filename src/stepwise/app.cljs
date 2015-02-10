@@ -14,6 +14,8 @@
   {:loc (model/zipper '[(println "Hello world!")
                         (def x 5)
                         (apply + [1 2 (- 10 7) 4 x])
+                        (if (+ 1 1) (* 3 5) (* -3 5))
+                        (if nil (* 3 5) (* 3 -5))
                         (let [foo (+ 1 2 3)
                               bar (- foo 4)]
                           (* foo bar))])
