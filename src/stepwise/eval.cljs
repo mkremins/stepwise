@@ -20,10 +20,10 @@
 (defn call-function [{[f & args] :children}]
   (model/parse (apply (extract-value f) (map extract-value args))))
 
-(defn resolve [{:keys [bindings loc] :as state}]
+(defn resolve [{:keys [bindings locals loc] :as state}]
   (let [{:keys [text]} (z/node loc)]
     (-> state
-        (update :loc z/replace (bindings (symbol text)))
+        (update :loc z/replace ((some-fn locals bindings) (symbol text)))
         (assoc :desc ["Replace the symbol " [:code text] " by its value."]))))
 
 (declare steps)
@@ -63,6 +63,50 @@
            (assoc-in [:bindings name]
              {:type :value :value value :text (str "user/" name)})
            (assoc :desc ["Establish the new binding in the current namespace."]))])))
+
+(defn bpair-steps [{:keys [loc] :as state}]
+  (let [name (symbol (:text (z/node loc)))
+        init-loc (z/right loc)
+        init-steps (steps (assoc state :loc init-loc))
+        state' (last init-steps)
+        value (extract-value (z/node (:loc state')))]
+    (concat
+      [(assoc state
+         :desc ["Bind the symbol " [:code (str name)] "..."])
+       (assoc state :loc init-loc
+         :desc ["...to the result of evaluating this form."])]
+      (butlast init-steps)
+      [(assoc-in state' [:locals name] (model/parse value))])))
+
+(defn bvec-steps [{:keys [loc] :as original-state}]
+  (loop [paths (->> loc z/node :children count range
+                    (map (partial conj (:path loc))) (take-nth 2))
+         state original-state
+         the-steps ()]
+    (if-let [path (first paths)]
+      (let [more-steps (bpair-steps (assoc-in state [:loc :path] path))]
+        (recur (rest paths) (last more-steps) (concat the-steps more-steps)))
+      (concat
+        [(assoc original-state
+           :desc ["Establish local bindings according to these binding pairs."])]
+        the-steps
+        [(-> (last the-steps)
+             (update :loc z/up)
+             (assoc :desc ["Bindings established. Let's evaluate the body."]))]))))
+
+(defmethod special-steps "let" [{:keys [loc] :as state}]
+  (let [head-loc (z/down loc)
+        bvec-steps (bvec-steps (assoc state :loc (z/right head-loc)))
+        body-steps (steps (update (last bvec-steps) :loc z/right))
+        state' (last body-steps)]
+    (concat
+      [(assoc state :loc head-loc
+         :desc ["It's a " [:code "let"] " form. Let's simplify."])]
+      bvec-steps
+      body-steps
+      [(-> state'
+           (update :loc #(-> % z/up (z/replace (z/node (:loc state')))))
+           (assoc :desc ["Replace the entire form with the value of its body."]))])))
 
 (defn seq-steps [state]
   (concat

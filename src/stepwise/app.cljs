@@ -13,11 +13,16 @@
 (def default-interpreter
   {:loc (model/zipper '[(println "Hello world!")
                         (def x 5)
-                        (apply + [1 2 (- 10 7) 4 x])])
+                        (apply + [1 2 (- 10 7) 4 x])
+                        (let [foo (+ 1 2 3)
+                              bar (- foo 4)]
+                          (* foo bar))])
    :bindings {'+ {:type :value :value + :text "cljs.core/+"}
               '- {:type :value :value - :text "cljs.core/-"}
+              '* {:type :value :value * :text "cljs.core/*"}
               'apply {:type :value :value apply :text "cljs.core/apply"}
-              'println {:type :value :value println :text "cljs.core/println"}}})
+              'println {:type :value :value println :text "cljs.core/println"}}
+   :locals {}})
 
 (def app-state
   (atom {:index 0 :steps (vec (eval/steps default-interpreter))}))
