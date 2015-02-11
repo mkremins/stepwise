@@ -20,10 +20,16 @@
 (defn call-function [{[f & args] :children}]
   (model/parse (apply (extract-value f) (map extract-value args))))
 
-(defn resolve [{:keys [bindings locals loc] :as state}]
-  (let [{:keys [text]} (z/node loc)]
-    (-> state
-        (update :loc z/replace ((some-fn locals bindings) (symbol text)))
+(defn locally-bind [state sym value]
+  (update state :scopes #(conj (pop %) (assoc (peek %) sym value))))
+
+(defn lookup-local [{:keys [scopes]} sym]
+  ((or (->> scopes reverse (filter #(contains? % sym)) first) {}) sym))
+
+(defn resolve [{:keys [defs loc] :as state}]
+  (let [{:keys [text]} (z/node loc)
+        sym (symbol text)]
+    (-> (update state :loc z/replace (or (lookup-local state sym) (defs sym)))
         (assoc :desc ["Replace the symbol " [:code text] " by its value."]))))
 
 (declare steps)
@@ -60,7 +66,7 @@
       init-steps
       [(-> state'
            (update :loc #(-> % z/up (z/replace {:type :value :text "#'user/x"})))
-           (assoc-in [:bindings name]
+           (assoc-in [:defs name]
              {:type :value :value value :text (str "user/" name)})
            (assoc :desc ["Establish the new binding in the current namespace."]))])))
 
@@ -101,12 +107,12 @@
        (assoc state :loc init-loc
          :desc ["...to the result of evaluating this form."])]
       (butlast init-steps)
-      [(assoc-in state' [:locals name] (model/parse value))])))
+      [(locally-bind state' name (model/parse value))])))
 
 (defn bvec-steps [{:keys [loc] :as original-state}]
   (loop [paths (->> loc z/node :children count range
                     (map (partial conj (:path loc))) (take-nth 2))
-         state original-state
+         state (update original-state :scopes conj {}) ; push new local scope
          the-steps ()]
     (if-let [path (first paths)]
       (let [more-steps (bpair-steps (assoc-in state [:loc :path] path))]
@@ -129,9 +135,9 @@
          :desc ["It's a " [:code "let"] " form. Let's simplify."])]
       bvec-steps
       body-steps
-      [(-> state'
-           (update :loc #(-> % z/up (z/replace (z/node (:loc state')))))
-           (assoc :desc ["Replace the entire form with the value of its body."]))])))
+      [(-> (update state' :loc #(-> % z/up (z/replace (z/node (:loc state')))))
+           (assoc :desc ["Replace the entire form with the value of its body."])
+           (update :scopes pop))])))
 
 (defn seq-steps [state]
   (concat
