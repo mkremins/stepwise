@@ -11,13 +11,15 @@
 (enable-console-print!)
 
 (def default-examples
-  [["function calls"
+  [[["Calling functions"]
     '[(println "Hello world!")
       (apply + [1 2 (- 10 7) 4 5])]]
-   ["if-then-else"
+
+   [["The " [:code "if"] " special form"]
     '[(if (+ 1 1) (* 3 5) :nope)
       (if nil (+ 42 11 13) 0)]]
-   ["def and let"
+
+   [["The " [:code "def"] " and " [:code "let"] " special forms"]
     '[(def foo 5)
       (let [foo (+ 1 2 3) bar (- foo 4)] (* foo bar))
       foo]]])
@@ -69,7 +71,11 @@
           last-index (dec (count steps))
           step (nth steps index)]
       (dom/div
-        (dom/h2 {:class "title"} title)
+        (dom/h2 {:class "title"}
+          (for [part title]
+            (if (= (first part) :code)
+              (dom/code (second part))
+              (dom/span part))))
         (om/build forms (:loc step))
         (dom/p {:class "description"}
           (for [part (:desc step)]
