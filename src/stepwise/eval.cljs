@@ -2,6 +2,15 @@
   (:require [stepwise.model :as model]
             [xyzzy.core :as z]))
 
+(defn init-step [forms]
+  {:loc (model/zipper forms)
+   :defs {'+ {:type :value :value + :text "cljs.core/+"}
+          '- {:type :value :value - :text "cljs.core/-"}
+          '* {:type :value :value * :text "cljs.core/*"}
+          'apply {:type :value :value apply :text "cljs.core/apply"}
+          'println {:type :value :value println :text "cljs.core/println"}}
+   :scopes []})
+
 (defn fully-simplified? [{:keys [children type]}]
   (case type
     (:bool :keyword :nil :number :string :regex :value) true
@@ -65,7 +74,7 @@
          :desc ["...and its value will be the result of evaluating this form."])]
       init-steps
       [(-> state'
-           (update :loc #(-> % z/up (z/replace {:type :value :text "#'user/x"})))
+           (update :loc #(-> % z/up (z/replace {:type :value :text (str "#'user/" name)})))
            (assoc-in [:defs name]
              {:type :value :value value :text (str "user/" name)})
            (assoc :desc ["Establish the new binding in the current namespace."]))])))
@@ -178,3 +187,6 @@
         :seq (seq-steps state)
         (:map :set :vec) (coll-steps state)
         :program (program-steps state)))))
+
+(defn init-state [forms]
+  {:index 0 :steps (vec (steps (init-step forms)))})

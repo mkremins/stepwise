@@ -9,10 +9,10 @@
     font-size: 16px;
     margin: 40px;
   }
-  .toplevel {
-    font-family: monospace;
-    margin-bottom: 1em;
-  }
+  .menu { margin-bottom: 3em; }
+  .menu > * { margin-right: 0.5em; }
+  .toplevel { font-family: monospace; }
+  .toplevel:not(:last-child) { margin-bottom: 1em; }
   .atom, .stringlike {
     display: inline-block;
     position: relative;
@@ -24,8 +24,16 @@
   .keyword { color: rgb(198,115,91); }
   .stringlike { color: rgb(21,144,155); }
   .delimiter { color: #777; }
-  .forms, .description { margin-bottom: 3em; }
-  .forms { line-height: 1.4; }
+  .title { margin-bottom: 1em; }
+  .forms {
+    background: #eee;
+    border-left: 0.25em solid #ccc;
+    line-height: 1.4;
+    margin-bottom: 2em;
+    max-width: 640px;
+    padding: 1em;
+  }
+  .description { margin-bottom: 2em; }
   code { line-height: 0.9; }
   input[type="range"] {
     display: block;

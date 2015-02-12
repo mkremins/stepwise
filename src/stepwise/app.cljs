@@ -10,25 +10,22 @@
 
 (enable-console-print!)
 
-(def default-interpreter
-  {:loc (model/zipper '[(println "Hello world!")
-                        (def foo 5)
-                        (apply + [1 2 (- 10 7) 4 foo])
-                        (if (+ 1 1) (* 3 5) (* -3 5))
-                        (if nil (* 3 5) (* 3 -5))
-                        (let [foo (+ 1 2 3)
-                              bar (- foo 4)]
-                          (* foo bar))
-                        foo])
-   :defs {'+ {:type :value :value + :text "cljs.core/+"}
-          '- {:type :value :value - :text "cljs.core/-"}
-          '* {:type :value :value * :text "cljs.core/*"}
-          'apply {:type :value :value apply :text "cljs.core/apply"}
-          'println {:type :value :value println :text "cljs.core/println"}}
-   :scopes []})
+(def default-examples
+  [["function calls"
+    '[(println "Hello world!")
+      (apply + [1 2 (- 10 7) 4 5])]]
+   ["if-then-else"
+    '[(if (+ 1 1) (* 3 5) :nope)
+      (if nil (+ 42 11 13) 0)]]
+   ["def and let"
+    '[(def foo 5)
+      (let [foo (+ 1 2 3) bar (- foo 4)] (* foo bar))
+      foo]]])
 
 (def app-state
-  (atom {:index 0 :steps (vec (eval/steps default-interpreter))}))
+  (atom {:index 0
+         :examples (mapv #(assoc (eval/init-state (second %)) :title (first %))
+                         default-examples)}))
 
 (defcomponent atom* [form owner]
   (render [_]
@@ -66,12 +63,13 @@
       (dom/div {:class "forms"}
         (om/build-all top-level-form (:children tree))))))
 
-(defcomponent view [data owner]
+(defcomponent example [data owner]
   (render [_]
-    (let [{:keys [index steps]} data
+    (let [{:keys [index steps title]} data
           last-index (dec (count steps))
           step (nth steps index)]
       (dom/div
+        (dom/h2 {:class "title"} title)
         (om/build forms (:loc step))
         (dom/p {:class "description"}
           (for [part (:desc step)]
@@ -91,5 +89,18 @@
                       {:disabled true}
                       {:on-click #(om/transact! data :index inc)})
           "Next >>")))))
+
+(defcomponent view [data owner]
+  (render [_]
+    (let [{:keys [index examples]} data]
+      (dom/div
+        (dom/div {:class "menu"}
+          (dom/strong "Examples:")
+          (for [n (range (count examples))]
+            (if (= n index)
+              (dom/span (str (inc n)))
+              (dom/a {:href "#" :on-click #(om/update! data :index n)}
+                (str (inc n))))))
+        (om/build example (nth examples index))))))
 
 (om/root view app-state {:target (.getElementById js/document "app")})
