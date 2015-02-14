@@ -127,16 +127,23 @@
           (conj lines (concat line (closer form)))
           (close-off lines (closer form)))))))
 
+(defn always-multiline? [form]
+  (and (= (:type form) :seq) (= (:text (first (:children form))) "let")))
+
+(defn multiline? [form]
+  (and (model/coll? form)
+       (or (not (fits-on-own-line? form)) (always-multiline? form))))
+
 (defn ->lines
   ([form] (->lines form *line-length*))
   ([form line-length]
     (binding [*line-length* line-length]
-      (if (or (not (model/coll? form)) (fits-on-own-line? form))
-        [(->tokens form)]
+      (if (multiline? form)
         (case (:type form)
           :map (map->lines form)
           (:fn :seq) (->lines* (annotate-head form))
-          (:vec :set) (->lines* form))))))
+          (:vec :set) (->lines* form))
+        [(->tokens form)]))))
 
 ;; lay out clojure.core macros
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
