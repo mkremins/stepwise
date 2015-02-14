@@ -18,11 +18,17 @@
     position: relative;
     vertical-align: top;
   }
-  .stringlike { white-space: pre-wrap; }
   .spacer { white-space: pre; }
   .selected { color: red !important; }
   .keyword { color: rgb(198,115,91); }
-  .stringlike { color: rgb(21,144,155); }
+  .stringlike {
+    color: rgb(21,144,155);
+    white-space: pre-wrap;
+  }
+  .symbol.head {
+    color: rgb(119,39,6);
+    font-weight: bold;
+  }
   .delimiter { color: #777; }
   .title { margin-bottom: 1em; }
   .forms {

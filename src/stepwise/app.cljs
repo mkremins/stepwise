@@ -39,7 +39,8 @@
 (defcomponent atom* [form owner]
   (render [_]
     (dom/div {:class (cond-> (str "atom " (name (:type form)))
-                             (:selected? form) (str " selected"))}
+                             (:selected? form) (str " selected")
+                             (:head? form) (str " head"))}
       (dom/span (:text form)))))
 
 (defcomponent stringlike [form owner]
