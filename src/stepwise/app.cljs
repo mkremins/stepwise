@@ -22,7 +22,14 @@
    [["The " [:code "def"] " and " [:code "let"] " special forms"]
     '[(def foo 5)
       (let [foo (+ 1 2 3) bar (- foo 4)] (* foo bar))
-      foo]]])
+      foo]]
+
+   [["Nested " [:code "let"] " forms"]
+    '[(let [foo (apply + (range 10))
+            bar (* foo 10)]
+        (let [foo (dec bar)
+              baz (inc foo)]
+          (* foo bar baz)))]]])
 
 (def app-state
   (atom {:index 0

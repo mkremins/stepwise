@@ -2,14 +2,15 @@
   (:require [stepwise.model :as model]
             [xyzzy.core :as z]))
 
+(def core-defs
+  (reduce (fn [defs [sym val]]
+            (assoc defs sym {:type :value :value val :text (str "cljs.core/" sym)}))
+          {}
+          {'+ + '- - '* * '/ / 'apply apply 'dec dec 'inc inc 'println println
+           'range range}))
+
 (defn init-step [forms]
-  {:loc (model/zipper forms)
-   :defs {'+ {:type :value :value + :text "cljs.core/+"}
-          '- {:type :value :value - :text "cljs.core/-"}
-          '* {:type :value :value * :text "cljs.core/*"}
-          'apply {:type :value :value apply :text "cljs.core/apply"}
-          'println {:type :value :value println :text "cljs.core/println"}}
-   :scopes []})
+  {:loc (model/zipper forms) :defs core-defs :scopes []})
 
 (defn fully-simplified? [{:keys [children type]}]
   (case type
@@ -23,6 +24,7 @@
   (case type
     (:bool :keyword :nil :number :string :regex :value) value
     :map (apply hash-map (map extract-value children))
+    :seq (map extract-value children)
     :set (set (map extract-value children))
     :vec (mapv extract-value children)))
 
