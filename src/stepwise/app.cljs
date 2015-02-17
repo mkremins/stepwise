@@ -29,7 +29,15 @@
             bar (* foo 10)]
         (let [foo (dec bar)
               baz (inc foo)]
-          (* foo bar baz)))]]])
+          (* foo bar baz)))]]
+
+   [["User-defined functions"]
+    '[(def greet
+        (fn greet
+          ([] (greet "world"))
+          ([name] (str "Hello, " name "!"))))
+      (greet "Max")
+      (greet)]]])
 
 (def app-state
   (atom {:index 0

@@ -1,5 +1,6 @@
 (ns stepwise.eval
   (:require [stepwise.model :as model]
+            [stepwise.util :refer [ensure]]
             [xyzzy.core :as z]))
 
 (def core-defs
@@ -7,7 +8,7 @@
             (assoc defs sym {:type :value :value val :text (str "cljs.core/" sym)}))
           {}
           {'+ + '- - '* * '/ / 'apply apply 'dec dec 'inc inc 'println println
-           'range range}))
+           'range range 'str str}))
 
 (defn init-step [forms]
   {:loc (model/zipper forms) :defs core-defs :scopes []})
@@ -42,6 +43,11 @@
         sym (symbol text)]
     (-> (update state :loc z/replace (or (lookup-local state sym) (defs sym)))
         (assoc :desc ["Replace the symbol " [:code text] " by its value."]))))
+
+(defrecord MyFn [methods])
+
+(defn method-for-argc [my-fn argc]
+  (first (filter #(= (count (:params %)) argc) (:methods my-fn))))
 
 (declare steps)
 
@@ -80,6 +86,37 @@
            (assoc-in [:defs name]
              {:type :value :value value :text (str "user/" name)})
            (assoc :desc ["Establish the new binding in the current namespace."]))])))
+
+(defn- human-readable-number [n]
+  (case n 0 "zero" 1 "one" 2 "two" 3 "three" 4 "four"
+          5 "five" 6 "six" 7 "seven" 8 "eight" 9 "nine"
+          (str n)))
+
+(defmethod special-steps "fn" [{:keys [loc] :as state}]
+  (let [head-loc (z/down loc)
+        next-loc (z/right head-loc)
+        name-loc (when (= (:type (z/node next-loc)) :symbol) next-loc)
+        name (when name-loc (:text (z/node name-loc)))
+        method-locs (cond-> (z/followers head-loc z/right) name rest)
+        parse-method (comp #(-> {:params (first %) :body (rest %)}) :value z/node)
+        fn-node {:type :value :value (MyFn. (map parse-method method-locs))
+                 :text (str "#<fn " (or name (gensym "f")) ">")}]
+    (concat
+      [(assoc state :loc head-loc
+         :desc ["It's an " [:code "fn"] " form. Let's define a function."])]
+      (when name
+        [(assoc state :loc name-loc
+           :desc ["This function has the local name " [:code name] ". "])
+         (assoc state :loc name-loc
+           :desc ["Within the function body, "
+                  [:code name] " refers to the function itself."])])
+      (for [method-loc method-locs
+            :let [arity (count (:children (z/node (z/down method-loc))))]]
+        (assoc state :loc method-loc
+          :desc ["Define a method that takes " (human-readable-number arity)
+                 " " (if (= arity 1) "argument" "arguments") "."]))
+      [(-> (update state :loc z/replace fn-node)
+           (assoc :desc ["Replace the entire form with the newly defined function."]))])))
 
 (defmethod special-steps "if" [{:keys [loc] :as state}]
   (let [head-loc (z/down loc)
@@ -132,8 +169,9 @@
         [(assoc original-state
            :desc ["Establish local bindings according to these binding pairs."])]
         the-steps
-        [(-> (last the-steps)
-             (update :loc z/up)
+        [(-> (if-let [state' (last the-steps)]
+               (update state' :loc z/up)
+               state)
              (assoc :desc ["Bindings established. Let's evaluate the body."]))]))))
 
 (defmethod special-steps "let" [{:keys [loc] :as state}]
@@ -150,6 +188,18 @@
            (assoc :desc ["Replace the entire form with the value of its body."])
            (update :scopes pop))])))
 
+(defn function-call-steps [{:keys [loc] :as state}]
+  (let [fn-loc (z/down loc)]
+    (if-let [my-fn (ensure (partial instance? MyFn) (:value (z/node fn-loc)))]
+      (let [args (map (comp extract-value z/node) (z/followers fn-loc z/right))
+            {:keys [params body]} (method-for-argc my-fn (count args))
+            let-form `(~'let [~@(interleave params args)] ~@body)
+            state' (-> (update state :loc z/replace (model/parse let-form))
+                       (assoc :desc ["Rewrite the function call as a " [:code "let"] " form."]))]
+        (cons state' (drop 2 (steps state'))))
+      [(-> (update state :loc z/edit call-function)
+           (assoc :desc ["Call the function with the given arguments."]))])))
+
 (defn seq-steps [state]
   (concat
     [(assoc state :desc ["Looks like a function call, or maybe a special form. Let's go deeper."])]
@@ -158,9 +208,7 @@
       (let [item-steps (steps* state)]
         (concat
           item-steps
-          [(-> (last item-steps)
-               (update :loc #(-> % z/up (z/edit call-function)))
-               (assoc :desc ["Call the function with the given arguments."]))])))))
+          (function-call-steps (update (last item-steps) :loc z/up)))))))
 
 (defn coll-steps [state]
   (let [item-steps (steps* state)]
