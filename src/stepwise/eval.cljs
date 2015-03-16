@@ -38,16 +38,28 @@
 (defn lookup-local [{:keys [scopes]} sym]
   ((or (->> scopes reverse (filter #(contains? % sym)) first) {}) sym))
 
+(defn desc [state & parts]
+  (assoc state :desc parts))
+
+(defn go [state loc]
+  (assoc state :loc loc))
+
+(defn zip [state f & args]
+  (apply update state :loc f args))
+
 (defn resolve [{:keys [defs loc] :as state}]
   (let [{:keys [text]} (z/node loc)
         sym (symbol text)]
-    (-> (update state :loc z/replace (or (lookup-local state sym) (defs sym)))
-        (assoc :desc ["Replace the symbol " [:code text] " by its value."]))))
+    (-> (zip state z/replace (or (lookup-local state sym) (defs sym)))
+        (desc "Replace the symbol " [:code text] " by its value."))))
 
-(defrecord MyFn [methods])
+(defrecord UserFn [methods])
 
-(defn method-for-argc [my-fn argc]
-  (first (filter #(= (count (:params %)) argc) (:methods my-fn))))
+(defn method-for-argc [user-fn argc]
+  (first (filter #(= (count (:params %)) argc) (:methods user-fn))))
+
+(defn step-sequence [& steps]
+  (mapcat #(if (or (sequential? %) (nil? %)) % [%]) steps))
 
 (declare steps)
 
@@ -70,22 +82,20 @@
         name-loc (z/right head-loc)
         name (symbol (:text (z/node name-loc)))
         init-loc (z/right name-loc)
-        init-steps (steps (assoc state :loc init-loc))
+        init-steps (steps (go state init-loc))
         state' (last init-steps)
         value (extract-value (z/node (:loc state')))]
-    (concat
-      [(assoc state :loc head-loc
-         :desc ["It's a " [:code "def"] " form. Let's define a new var."])
-       (assoc state :loc name-loc
-         :desc ["The var's name will be " [:code (str name)] "..."])
-       (assoc state :loc init-loc
-         :desc ["...and its value will be the result of evaluating this form."])]
+    (step-sequence
+      (-> (go state head-loc)
+          (desc "It's a " [:code "def"] " form. Let's define a new var."))
+      (-> (go state name-loc)
+          (desc "The var's name will be " [:code (str name)] "..."))
+      (-> (go state init-loc)
+          (desc "...and its value will be the result of evaluating this form."))
       init-steps
-      [(-> state'
-           (update :loc #(-> % z/up (z/replace {:type :value :text (str "#'user/" name)})))
-           (assoc-in [:defs name]
-             {:type :value :value value :text (str "user/" name)})
-           (assoc :desc ["Establish the new binding in the current namespace."]))])))
+      (-> (zip state' #(-> % z/up (z/replace {:type :value :text (str "#'user/" name)})))
+          (assoc-in [:defs name] {:type :value :value value :text (str "user/" name)})
+          (desc "Establish the new binding in the current namespace.")))))
 
 (defn- human-readable-number [n]
   (case n 0 "zero" 1 "one" 2 "two" 3 "three" 4 "four"
@@ -99,63 +109,59 @@
         name (when name-loc (:text (z/node name-loc)))
         method-locs (cond-> (z/followers head-loc z/right) name rest)
         parse-method (comp #(-> {:params (first %) :body (rest %)}) :value z/node)
-        fn-node {:type :value :value (MyFn. (map parse-method method-locs))
+        fn-node {:type :value :value (UserFn. (map parse-method method-locs))
                  :text (str "#<fn " (or name (gensym "f")) ">")}]
-    (concat
-      [(assoc state :loc head-loc
-         :desc ["It's an " [:code "fn"] " form. Let's define a function."])]
+    (step-sequence
+      (-> (go state head-loc)
+          (desc "It's an " [:code "fn"] " form. Let's define a function."))
       (when name
-        [(assoc state :loc name-loc
-           :desc ["This function has the local name " [:code name] ". "])
-         (assoc state :loc name-loc
-           :desc ["Within the function body, "
-                  [:code name] " refers to the function itself."])])
+        [(-> (go state name-loc)
+             (desc "This function has the local name " [:code name] "."))
+         (-> (go state name-loc)
+             (desc "Within the function body, " [:code name] " refers to the function itself."))])
       (for [method-loc method-locs
             :let [arity (count (:children (z/node (z/down method-loc))))]]
-        (assoc state :loc method-loc
-          :desc ["Define a method that takes " (human-readable-number arity)
-                 " " (if (= arity 1) "argument" "arguments") "."]))
-      [(-> (update state :loc z/replace fn-node)
-           (assoc :desc ["Replace the entire form with the newly defined function."]))])))
+        (-> (go state method-loc)
+            (desc "Define a method that takes " (human-readable-number arity)
+                  " " (if (= arity 1) "argument" "arguments") ".")))
+      (-> (zip state z/replace fn-node)
+          (desc "Replace the entire form with the newly defined function.")))))
 
 (defmethod special-steps "if" [{:keys [loc] :as state}]
   (let [head-loc (z/down loc)
         test-loc (z/right head-loc)
-        test-steps (steps (assoc state :loc test-loc))
+        test-steps (steps (go state test-loc))
         state' (last test-steps)
         test-value (extract-value (z/node (:loc state')))
         [truthy branch1 branch2] (if test-value ["truthy" "first" "second"]
                                                 ["falsey" "second" "first"])
         branch-loc (cond-> (z/right (:loc state')) (not test-value) z/right)
-        branch-steps (steps (assoc state' :loc branch-loc))
+        branch-steps (steps (go state' branch-loc))
         state'' (last branch-steps)]
-    (concat
-      [(assoc state :loc head-loc
-         :desc ["It's an " [:code "if"] " form. Let's simplify."])
-       (assoc state :loc test-loc
-         :desc ["Evaluate the condition to determine which branch to take."])]
+    (step-sequence
+      (-> (go state head-loc)
+          (desc "It's an " [:code "if"] " form. Let's simplify."))
+      (-> (go state test-loc)
+          (desc "Evaluate the condition to determine which branch to take."))
       test-steps
-      [(assoc state' :desc ["The condition is " truthy ". Evaluate the "
-                            branch1 " branch and ignore the " branch2 "."])]
+      (desc state' "The condition is " truthy ". Evaluate the " branch1
+                   " branch and ignore the " branch2 ".")
       branch-steps
-      [(-> state''
-           (update :loc #(-> % z/up (z/replace (z/node (:loc state'')))))
-           (assoc :desc ["Replace the entire form with the value of the "
-                         branch1 " branch."]))])))
+      (-> (zip state'' #(-> % z/up (z/replace (z/node (:loc state'')))))
+          (desc "Replace the entire form with the value of the " branch1 " branch.")))))
 
 (defn bpair-steps [{:keys [loc] :as state}]
   (let [name (symbol (:text (z/node loc)))
         init-loc (z/right loc)
-        init-steps (steps (assoc state :loc init-loc))
+        init-steps (steps (go state init-loc))
         state' (last init-steps)
         value (extract-value (z/node (:loc state')))]
-    (concat
-      [(assoc state
-         :desc ["Bind the symbol " [:code (str name)] "..."])
-       (assoc state :loc init-loc
-         :desc ["...to the result of evaluating this form."])]
+    (step-sequence
+      (desc state "Bind the symbol " [:code (str name)] "...")
+      (-> (go state init-loc)
+          (desc "...to the result of evaluating this form."))
       (butlast init-steps)
-      [(locally-bind state' name (model/parse value))])))
+      (locally-bind state' name (model/parse value)))))
 
 (defn bvec-steps [{:keys [loc] :as original-state}]
   (loop [paths (->> loc z/node :children count range
@@ -165,73 +171,66 @@
     (if-let [path (first paths)]
       (let [more-steps (bpair-steps (assoc-in state [:loc :path] path))]
         (recur (rest paths) (last more-steps) (concat the-steps more-steps)))
-      (concat
-        [(assoc original-state
-           :desc ["Establish local bindings according to these binding pairs."])]
+      (step-sequence
+        (desc original-state "Establish local bindings according to these binding pairs.")
         the-steps
-        [(-> (if-let [state' (last the-steps)]
-               (update state' :loc z/up)
-               state)
-             (assoc :desc ["Bindings established. Let's evaluate the body."]))]))))
+        (-> (if-let [state' (last the-steps)] (zip state' z/up) state)
+            (desc "Bindings established. Let's evaluate the body."))))))
 
 (defmethod special-steps "let" [{:keys [loc] :as state}]
   (let [head-loc (z/down loc)
-        bvec-steps (bvec-steps (assoc state :loc (z/right head-loc)))
-        body-steps (steps (update (last bvec-steps) :loc z/right))
+        bvec-steps (bvec-steps (go state (z/right head-loc)))
+        body-steps (steps (zip (last bvec-steps) z/right))
         state' (last body-steps)]
-    (concat
-      [(assoc state :loc head-loc
-         :desc ["It's a " [:code "let"] " form. Let's simplify."])]
+    (step-sequence
+      (-> (go state head-loc)
+          (desc "It's a " [:code "let"] " form. Let's simplify."))
       bvec-steps
       body-steps
-      [(-> (update state' :loc #(-> % z/up (z/replace (z/node (:loc state')))))
-           (assoc :desc ["Replace the entire form with the value of its body."])
-           (update :scopes pop))])))
+      (-> (zip state' #(-> % z/up (z/replace (z/node (:loc state')))))
+          (desc "Replace the entire form with the value of its body.")
+          (update :scopes pop)))))
 
-(defn function-call-steps [{:keys [loc] :as state}]
+(defn funcall-steps [{:keys [loc] :as state}]
   (let [fn-loc (z/down loc)]
-    (if-let [my-fn (ensure (partial instance? MyFn) (:value (z/node fn-loc)))]
+    (if-let [user-fn (ensure (partial instance? UserFn) (:value (z/node fn-loc)))]
       (let [args (map (comp extract-value z/node) (z/followers fn-loc z/right))
-            {:keys [params body]} (method-for-argc my-fn (count args))
+            {:keys [params body]} (method-for-argc user-fn (count args))
             let-form `(~'let [~@(interleave params args)] ~@body)
-            state' (-> (update state :loc z/replace (model/parse let-form))
-                       (assoc :desc ["Rewrite the function call as a " [:code "let"] " form."]))]
+            state' (-> (zip state z/replace (model/parse let-form))
+                       (desc "Rewrite the function call as a " [:code "let"] " form."))]
         (cons state' (drop 2 (steps state'))))
-      [(-> (update state :loc z/edit call-function)
-           (assoc :desc ["Call the function with the given arguments."]))])))
+      [(-> (zip state z/edit call-function)
+           (desc "Call the function with the given arguments."))])))
 
 (defn seq-steps [state]
-  (concat
-    [(assoc state :desc ["Looks like a function call, or maybe a special form. Let's go deeper."])]
+  (step-sequence
+    (desc state "Looks like a function call, or maybe a special form. Let's go deeper.")
     (if-let [special-steps* (get-method special-steps (head-text state))]
       (special-steps* state)
       (let [item-steps (steps* state)]
-        (concat
-          item-steps
-          (function-call-steps (update (last item-steps) :loc z/up)))))))
+        (concat item-steps (funcall-steps (zip (last item-steps) z/up)))))))
 
 (defn coll-steps [state]
   (let [item-steps (steps* state)]
-    (concat
-      [(assoc state :desc ["This form is a collection. Let's take a look at its items."])]
+    (step-sequence
+      (desc state "This form is a collection. Let's take a look at its items.")
       item-steps
-      [(-> (last item-steps)
-           (update :loc z/up)
-           (assoc :desc ["All items have been simplified. Let's move on."]))])))
+      (-> (zip (last item-steps) z/up)
+          (desc "All items have been simplified. Let's move on.")))))
 
 (defn program-steps [state]
   (let [top-level-steps (steps* state)]
-    (concat
-      [(assoc state :desc ["Let's evaluate these forms step by step."])]
+    (step-sequence
+      (desc state "Let's evaluate these forms step by step.")
       top-level-steps
-      [(-> (last top-level-steps)
-           (update :loc z/up)
-           (assoc :desc ["Nothing left to simplify. Looks like our work here is done!"]))])))
+      (-> (zip (last top-level-steps) z/up)
+          (desc "Nothing left to simplify. Looks like our work here is done!")))))
 
 (defn steps [state]
   (let [node (z/node (:loc state))]
     (if (fully-simplified? node)
-      [(assoc state :desc ["This form is completely simplified. Let's move on."])]
+      [(desc state "This form is completely simplified. Let's move on.")]
       (case (:type node)
         :symbol [(resolve state)]
         :seq (seq-steps state)
