@@ -1,17 +1,11 @@
 (ns stepwise.eval
   (:require [stepwise.model :as model]
+            [stepwise.stdlib :as stdlib]
             [stepwise.util :refer [ensure]]
             [xyzzy.core :as z]))
 
-(def core-defs
-  (reduce (fn [defs [sym val]]
-            (assoc defs sym {:type :value :value val :text (str "cljs.core/" sym)}))
-          {}
-          {'+ + '- - '* * '/ / 'apply apply 'dec dec 'inc inc 'println println
-           'range range 'str str}))
-
 (defn init-step [forms]
-  {:loc (model/zipper forms) :defs core-defs :scopes []})
+  {:loc (model/zipper forms) :defs stdlib/core-defs :scopes []})
 
 (defn fully-simplified? [{:keys [children type]}]
   (case type
