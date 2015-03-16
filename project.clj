@@ -1,9 +1,9 @@
 (defproject stepwise "0.0-SNAPSHOT"
   :dependencies
   [[org.clojure/clojure "1.6.0"]
-   [org.clojure/clojurescript "0.0-2760"]
-   [org.omcljs/om "0.8.6"]
-   [prismatic/om-tools "0.3.10"]
+   [org.clojure/clojurescript "0.0-3115"]
+   [org.omcljs/om "0.8.8"]
+   [prismatic/om-tools "0.3.11"]
    [mkremins/xyzzy "0.3.3"]]
   
   :plugins
