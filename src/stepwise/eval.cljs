@@ -112,7 +112,7 @@
         (desc (go state method) "Define a method that takes " (human-readable-number argc)
                                 " " (if (= argc 1) "argument" "arguments") "."))
       (desc (zip state z/replace fn-node)
-            "Replace the entire form with the newly defined function."))))
+            "Replace the entire " [:code "fn"] " form with the newly defined function."))))
 
 (defmethod special-steps "if" [{:keys [loc] :as state}]
   (let [head (z/down loc)
@@ -133,7 +133,7 @@
                    " branch and ignore the " branch2 ".")
       branch-steps
       (desc (zip state'' #(-> % z/up (z/replace (z/node (:loc state'')))))
-            "Replace the entire form with the value of the " branch1 " branch."))))
+            "Replace the entire " [:code "if"] " form with the value of the " branch1 " branch."))))
 
 (defn bpair-steps [{:keys [loc] :as state}]
   (let [name (symbol (:text (z/node loc)))
@@ -172,7 +172,7 @@
       body-steps
       (desc (-> (zip state' #(-> % z/up (z/replace (z/node (:loc state')))))
                 (update :scopes pop))
-            "Replace the entire form with the value of its body."))))
+            "Replace the entire " [:code "let"] " form with the value of its body."))))
 
 (defn funcall-steps [{:keys [loc] :as state}]
   (let [func (z/down loc)]
@@ -183,8 +183,9 @@
             state' (desc (zip state z/replace (model/parse let-form))
                          "Rewrite the function call as a " [:code "let"] " form.")]
         (cons state' (drop 2 (steps state'))))
-      [(desc (zip state z/edit call-function)
-             "Call the function " [:code (:text (z/node func))] " with the given arguments.")])))
+      [(desc state "Call the function " [:code (:text (z/node func))] " with the given arguments...")
+       (desc (zip state z/edit call-function)
+             "...and replace the entire function call with its return value.")])))
 
 (defn seq-steps [state]
   (step-sequence
