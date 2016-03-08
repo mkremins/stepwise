@@ -66,7 +66,7 @@
 (defcomponent top-level-form [form owner]
   (render [_]
     (dom/div {:class "toplevel"}
-      (for [line (layout/->lines form 80)]
+      (for [line (layout/->lines form 60)]
         (dom/div {:class "line"}
           (for [token line]
             (condp #(%1 %2) token
