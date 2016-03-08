@@ -183,7 +183,8 @@
             state' (desc (zip state z/replace (model/parse let-form))
                          "Rewrite the function call as a " [:code "let"] " form.")]
         (cons state' (drop 2 (steps state'))))
-      [(desc (zip state z/edit call-function) "Call the function with the given arguments.")])))
+      [(desc (zip state z/edit call-function)
+             "Call the function " [:code (:text (z/node func))] " with the given arguments.")])))
 
 (defn seq-steps [state]
   (step-sequence
