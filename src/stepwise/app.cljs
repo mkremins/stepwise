@@ -134,7 +134,7 @@
         (dom/p {:class "error"} error)
         (om/build stepper data)))))
 
-(defcomponent route-button [data owner {:keys [label my-route]}]
+(defcomponent route-button [data owner {:keys [label], my-route :route}]
   (render [_]
     (if (= (:route data) my-route)
       (dom/span label)
@@ -150,10 +150,10 @@
           (dom/strong "Examples:")
           (for [n (map inc (range (count examples)))]
             (om/build route-button data
-              {:opts {:label n :my-route (str "example-" n)}}))
+              {:opts {:label n :route (str "example-" n)}}))
           (dom/span "|")
           (om/build route-button data
-            {:opts {:label "Sandbox" :my-route "sandbox"}}))
+            {:opts {:label "Sandbox" :route "sandbox"}}))
         (if-let [example-data (get examples route)]
           (om/build example example-data)
           (om/build sandbox (:sandbox data)))))))
