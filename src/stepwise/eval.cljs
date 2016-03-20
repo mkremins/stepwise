@@ -1,5 +1,7 @@
 (ns stepwise.eval
-  (:require [stepwise.model :as model]
+  (:require [cljs.tools.reader :as reader]
+            [cljs.tools.reader.reader-types :as reader-types]
+            [stepwise.model :as model]
             [stepwise.stdlib :as stdlib]
             [stepwise.util :refer [ensure]]
             [xyzzy.core :as z]))
@@ -220,5 +222,20 @@
         (:map :set :vec) (coll-steps state)
         :program (program-steps state)))))
 
-(defn init-state [forms]
-  {:index 0 :steps (vec (steps (init-step forms)))})
+(defn read-all-forms [code]
+  (let [reader (reader-types/string-push-back-reader code)
+        eof (js/Object.)]
+    (loop [forms []]
+      (let [form (reader/read reader false eof)]
+        (if (= form eof)
+          forms
+          (recur (conj forms form)))))))
+
+(defn init-state [code]
+  (-> (try
+        (let [forms (read-all-forms code)]
+          (if (empty? forms)
+            {:error "Must provide at least one valid form"}
+            {:index 0 :steps (vec (steps (init-step forms)))}))
+        (catch js/Error err {:error (.-message err)}))
+      (assoc :code code)))

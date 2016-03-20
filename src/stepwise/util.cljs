@@ -11,3 +11,7 @@
   Implicitly curried: `(ensure pred)` expands to `(partial ensure pred)`."
   ([pred] (partial ensure pred))
   ([pred x] (when (pred x) x)))
+
+(defn value
+  "Returns the value of the target of a JS input event."
+  [ev] (.. ev -target -value))
