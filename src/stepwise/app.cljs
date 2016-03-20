@@ -11,27 +11,30 @@
 
 (enable-console-print!)
 
-(defn update-code [state new-code]
-  (merge (dissoc state :error) (eval/init-state new-code)))
-
 (def default-examples
-  [(update-code {:title ["Calling functions"]}
-     "(println \"Hello world!\")\n\n(apply + [1 2 (- 10 7) 4 5])")
+  {"example-1"
+   (assoc (eval/init-state "(println \"Hello world!\")\n\n(apply + [1 2 (- 10 7) 4 5])")
+          :title ["Calling functions"])
 
-   (update-code {:title ["The " [:code "if"] " special form"]}
-     "(if (+ 1 1) (* 3 5) :nope)\n\n(if nil (+ 42 11 13) 0)")
+   "example-2"
+   (assoc (eval/init-state "(if (+ 1 1) (* 3 5) :nope)\n\n(if nil (+ 42 11 13) 0)")
+          :title ["The " [:code "if"] " special form"])
 
-   (update-code {:title ["The " [:code "def"] " and " [:code "let"] " special forms"]}
-     "(def foo 5)\n\n(let [foo (+ 1 2 3) bar (- foo 4)] (* foo bar))\n\nfoo")
+   "example-3"
+   (assoc (eval/init-state "(def foo 5)\n\n(let [foo (+ 1 2 3) bar (- foo 4)] (* foo bar))\n\nfoo")
+          :title ["The " [:code "def"] " and " [:code "let"] " special forms"])
 
-   (update-code {:title ["Nested " [:code "let"] " forms"]}
+   "example-4"
+   (assoc (eval/init-state
 "(let [foo (apply + (range 10))
       bar (* foo 10)]
   (let [foo (dec bar)
         baz (inc foo)]
     (* foo bar baz)))")
+          :title ["Nested " [:code "let"] " forms"])
 
-   (update-code {:title ["User-defined functions"]}
+   "example-5"
+   (assoc (eval/init-state
 "(def greet
   (fn greet
     ([] (greet \"world\"))
@@ -39,10 +42,13 @@
 
 (greet \"Max\")
 
-(greet)")])
+(greet)")
+          :title ["User-defined functions"])})
 
 (def app-state
-  (atom {:index 0 :examples default-examples}))
+  (atom {:route "example-1"
+         :examples default-examples
+         :sandbox (eval/init-state "")}))
 
 (defcomponent atom* [form owner]
   (render [_]
@@ -106,34 +112,50 @@
                       {:on-click #(om/transact! data :index inc)})
           "Next >>")))))
 
-(defcomponent explanation [data owner]
+(defcomponent example [data owner]
   (render [_]
-    (let [{:keys [code error title] :or {title ["Sandbox"]}} data]
-      (dom/div
-        (dom/h2 {:class "title"}
-          (for [part title]
-            (if (= (first part) :code)
-              (dom/code (second part))
-              (dom/span part))))
-        (dom/textarea
-          {:on-change (fn [ev] (om/transact! data #(update-code % (value ev))))
-           :placeholder "Enter code to explain here..."
-           :value code})
-        (if error
-          (dom/p {:class "error"} error)
-          (om/build stepper data))))))
+    (dom/div
+      (dom/h2 {:class "title"}
+        (for [part (:title data)]
+          (if (= (first part) :code)
+            (dom/code (second part))
+            (dom/span part))))
+      (om/build stepper data))))
+
+(defcomponent sandbox [data owner]
+  (render [_]
+    (dom/div
+      (dom/h2 {:class "title"} "Sandbox")
+      (dom/textarea
+        {:on-change #(om/update! data (eval/init-state (value %)))
+         :placeholder "Enter code to explain here..."
+         :value (:code data)})
+      (if-let [error (:error data)]
+        (dom/p {:class "error"} error)
+        (om/build stepper data)))))
+
+(defcomponent route-button [data owner {:keys [label my-route]}]
+  (render [_]
+    (if (= (:route data) my-route)
+      (dom/span label)
+      (dom/a {:href (str "#" my-route)
+              :on-click #(om/update! data :route my-route)}
+        label))))
 
 (defcomponent view [data owner]
   (render [_]
-    (let [{:keys [index examples]} data]
+    (let [{:keys [examples route]} data]
       (dom/div
         (dom/div {:class "menu"}
           (dom/strong "Examples:")
-          (for [n (range (count examples))]
-            (if (= n index)
-              (dom/span (str (inc n)))
-              (dom/a {:href "#" :on-click #(om/update! data :index n)}
-                (str (inc n))))))
-        (om/build explanation (nth examples index))))))
+          (for [n (map inc (range (count examples)))]
+            (om/build route-button data
+              {:opts {:label n :my-route (str "example-" n)}}))
+          (dom/span "|")
+          (om/build route-button data
+            {:opts {:label "Sandbox" :my-route "sandbox"}}))
+        (if-let [example-data (get examples route)]
+          (om/build example example-data)
+          (om/build sandbox (:sandbox data)))))))
 
 (om/root view app-state {:target (.getElementById js/document "app")})
