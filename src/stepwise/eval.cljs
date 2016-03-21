@@ -31,8 +31,13 @@
 (defn locally-bind [state sym value]
   (update state :scopes #(conj (pop %) (assoc (peek %) sym value))))
 
+(def undefined
+  "Sentinel value used by `lookup-local` and `resolve` to indicate that a
+  symbol is not bound to any value."
+  (js/Object.))
+
 (defn lookup-local [{:keys [scopes]} sym]
-  ((or (->> scopes reverse (filter #(contains? % sym)) first) {}) sym))
+  (get (->> scopes reverse (filter #(contains? % sym)) first) sym undefined))
 
 (defn desc [state & parts]
   (assoc state :desc parts))
@@ -45,9 +50,13 @@
 
 (defn resolve [{:keys [defs loc] :as state}]
   (let [{:keys [text]} (z/node loc)
-        sym (symbol text)]
-    (desc (zip state z/replace (or (lookup-local state sym) (defs sym)))
-          "Replace the symbol " [:code text] " by its value.")))
+        sym (symbol text)
+        local (lookup-local state sym)
+        value (if (= local undefined) (defs sym undefined) local)]
+    (if (= value undefined)
+      (throw (ex-info (str "The symbol " sym " isn't bound to any value") {}))
+      (desc (zip state z/replace value)
+            "Replace the symbol " [:code text] " by its value."))))
 
 (defrecord UserFn [methods])
 
