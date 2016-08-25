@@ -87,6 +87,26 @@
       (dom/div {:class "forms"}
         (om/build-all top-level-form (:children tree))))))
 
+(defcomponent bindings [data owner]
+  (render [_]
+    (let [step (nth (:steps data) (:index data))]
+      (dom/div {:class "bindings"}
+        (dom/h2 {:class "title"} "Bindings")
+        (dom/table {:class "scope global"}
+          (dom/tbody
+            (for [[k v] (:defs step)
+                  :when (not (.includes (:text v) "cljs.core/"))]
+              (dom/tr
+                (dom/td (str k))
+                (dom/td (:text v))))))
+        (for [scope (reverse (:scopes step))]
+          (dom/table {:class "scope local"}
+            (dom/tbody
+              (for [[k v] scope]
+                (dom/tr
+                  (dom/td (str k))
+                  (dom/td (:text v)))))))))))
+
 (defcomponent stepper [data owner]
   (render [_]
     (let [{:keys [index steps]} data
@@ -155,7 +175,11 @@
           (om/build route-button data
             {:opts {:label "Sandbox" :route "sandbox"}}))
         (if-let [example-data (get examples route)]
-          (om/build example example-data)
-          (om/build sandbox (:sandbox data)))))))
+          (dom/div {:class "columns"}
+            (om/build example example-data)
+            (om/build bindings example-data))
+          (dom/div {:class "columns"}
+            (om/build sandbox (:sandbox data))
+            (om/build bindings (:sandbox data))))))))
 
 (om/root view app-state {:target (.getElementById js/document "app")})
