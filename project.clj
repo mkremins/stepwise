@@ -1,4 +1,4 @@
-(defproject stepwise "0.0-SNAPSHOT"
+(defproject mkremins/stepwise "0.0-SNAPSHOT"
   :dependencies
   [[org.clojure/clojure "1.8.0"]
    [org.clojure/clojurescript "1.7.228"]
@@ -13,7 +13,6 @@
   :cljsbuild
   {:builds [{:source-paths ["src"]
              :compiler {:main stepwise.app
-                        :output-dir "target"
-                        :output-to "target/stepwise.js"
-                        :source-map true
-                        :optimizations :none}}]})
+                        :output-dir "docs/js"
+                        :output-to "docs/js/stepwise.js"
+                        :optimizations :advanced}}]})
